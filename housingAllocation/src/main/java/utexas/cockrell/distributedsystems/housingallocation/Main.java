@@ -11,16 +11,11 @@ package utexas.cockrell.distributedsystems.housingallocation;
  */
 public class Main {
 
-    public static final int NUM_HOUSES = 100;
-    public static final int NUM_AGENTS = 100;
-
-    public static final int NUM_HOUSE_VARIATIONS = 100;
-    public static final int NUM_AGENT_VARIATRIONS = 100;
+    public static final int NUM_HOUSE_AND_AGENTS = 100;
 
     public static void main(String[] args) {
-        
+
         Agency agency = Agency.getInstance();
-        RealEstate realEstate = RealEstate.getInstance();
 
     }
 

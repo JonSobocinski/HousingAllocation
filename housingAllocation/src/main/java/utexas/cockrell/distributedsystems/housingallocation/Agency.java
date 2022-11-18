@@ -5,6 +5,9 @@
  */
 package utexas.cockrell.distributedsystems.housingallocation;
 
+import java.util.ArrayList;
+import java.util.Collections;
+import java.util.List;
 import java.util.Random;
 import java.util.concurrent.CopyOnWriteArrayList;
 
@@ -18,11 +21,13 @@ public class Agency {
     private static Agency agency;
     private static Random random = new Random();
 
-    CopyOnWriteArrayList agentList = new CopyOnWriteArrayList();
+    CopyOnWriteArrayList<Agent> agentList = new CopyOnWriteArrayList<>();
+    CopyOnWriteArrayList<Integer> availableHouses = new CopyOnWriteArrayList<>();
 
     private Agency() {
-        for (int i = 0; i < Main.NUM_AGENTS; i++) {
-            agentList.add(new Agent());
+        for (int i = 0; i < Main.NUM_HOUSE_AND_AGENTS; i++) {
+            agentList.add(new Agent(i));
+            availableHouses.add(i);
         }
     }
 
@@ -34,13 +39,39 @@ public class Agency {
         return agency;
     }
 
-    public class Agent {
+    public class Agent implements Runnable {
 
-        private final int preferenceOne;
+        private final List<Integer> preferenceList;
+        private int currentHouse;
+        
+        private boolean firstPreference = false;
 
-        private Agent() {
-            preferenceOne = random.nextInt(Main.NUM_AGENT_VARIATRIONS);
+        private Agent(int currentHouse) {
+            this.currentHouse = currentHouse;
+
+            preferenceList = new ArrayList<>();
+
+            for (int i = 0; i < Main.NUM_HOUSE_AND_AGENTS; i++) {
+                preferenceList.add(i);
+            }
+            Collections.shuffle(preferenceList);
+            
+            firstPreference = preferenceList.get(0) == currentHouse;
+            
+            System.out.println(this.toString());
         }
+
+        @Override
+        public void run() {
+            throw new UnsupportedOperationException("Not supported yet."); //To change body of generated methods, choose Tools | Templates.
+        }
+
+        @Override
+        public String toString() {
+            return "Agent{" + "preferenceList=" + preferenceList + ", currentHouse=" + currentHouse + ", firstPreference=" + firstPreference + '}';
+        }
+
+       
 
     }
 
