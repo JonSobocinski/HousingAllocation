@@ -58,6 +58,11 @@ public class Agency {
                 }
             }
         }
+        
+        //for (Agent ag: agentList) {
+        //    lasVegasTTC(ag);
+        //}
+        lasVegasTTC(agentList.get(0));
 
         MESSAGE_SENDER.firePropertyChange(SEND_STATUS, null, null);
 
@@ -69,6 +74,53 @@ public class Agency {
             init = true;
         }
         return agency;
+    }
+    
+    public void lasVegasTTC(Agent agent) {
+        while (agent.isActive) {
+            //COIN FLIP STEP
+
+            //Flip coin for current agent
+            //Random random = new Random();
+            int myflip = random.nextInt(2);
+            if (myflip == 0) 
+                agent.myCoin = Agent.Coin.Heads;
+            else if (myflip == 1)
+                agent.myCoin = Agent.Coin.Tails;
+
+            //Flip coin for successor
+            int succflip = random.nextInt(2);
+            if (succflip == 0) 
+                agent.connectedAgent.myCoin = Agent.Coin.Heads;
+            else if (succflip == 1)
+                agent.connectedAgent.myCoin = Agent.Coin.Tails;
+            System.out.println("My coin: " + agent.myCoin + ", succ coin: " + agent.connectedAgent.myCoin);
+            
+            if (agent.myCoin == Agent.Coin.Heads && agent.connectedAgent.myCoin == Agent.Coin.Tails) {
+                System.out.println("Agent " + agent.currentHouse + " is now inactive");
+                agent.isActive = false;
+            }
+            
+            //EXPLORE STEP
+            if (agent.isActive) {
+                boolean succActive = agent.connectedAgent.isActive;
+                while (!succActive) {
+                    agent.children.add(agent.connectedAgent);
+                    agent.connectedAgent = agent.connectedAgent.connectedAgent;
+                    succActive = agent.connectedAgent.isActive;
+                }
+                
+                if (agent.connectedAgent == agent)
+                    agent.isActive = false;
+            }
+        }
+        
+        //NOTIFY STEP
+        if (agent.connectedAgent == agent){
+            //send "cycle" to children
+            agent.inCycle = true;
+        }
+            
     }
 
     private void removeAgentWithFirstPreference(Agent agent) {
@@ -85,12 +137,17 @@ public class Agency {
     public class Agent implements Runnable, PropertyChangeListener {
 
         private Agent connectedAgent;
+        private ArrayList<Agent> children = new ArrayList<>();
 
         private final List<Integer> preferenceList;
         private int currentHouse;
 
         private boolean firstPreference = false;
         private boolean isActive = true;
+        private boolean inCycle = false;
+        
+        private enum Coin {Heads, Tails};
+        Coin myCoin;
 
         private Agent(int currentHouse) {
             this.currentHouse = currentHouse;
@@ -103,6 +160,8 @@ public class Agency {
             Collections.shuffle(preferenceList);
 
             firstPreference = preferenceList.get(0) == currentHouse;
+            
+            //lasVegasTTC();
         }
 
         @Override
@@ -134,7 +193,7 @@ public class Agency {
                     + "\tpreferenceListSize: " + preferenceList.size() + "\n"
                     + "\tconnectedAgent: " + connectedAgent.currentHouse;
         }
-
+    
     }
 
 }

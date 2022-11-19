@@ -11,7 +11,7 @@ package utexas.cockrell.distributedsystems.housingallocation;
  */
 public class Main {
 
-    public static final int NUM_HOUSE_AND_AGENTS = 100;
+    public static final int NUM_HOUSE_AND_AGENTS = 15;
 
     public static void main(String[] args) {
 
