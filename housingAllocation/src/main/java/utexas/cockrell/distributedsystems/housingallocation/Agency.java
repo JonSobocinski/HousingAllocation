@@ -46,6 +46,7 @@ public class Agency {
             Agent agent = new Agent(i);
             MESSAGE_SENDER.addPropertyChangeListener(agent);
             agentList.add(agent);
+            System.out.println(agent);
 
 //            removeAgentWithFirstPreference(agent); For now, we don't remove agents that have their first preference
         }
@@ -60,10 +61,10 @@ public class Agency {
             }
         }
 
-        //for (Agent ag: agentList) {
-        //    lasVegasTTC(ag);
-        //}
-        lasVegasTTC(agentList.get(0));
+        for (Agent ag: agentList) {
+            lasVegasTTC(ag);
+        }
+        //lasVegasTTC(agentList.get(0));
 
         MESSAGE_SENDER.firePropertyChange(SEND_STATUS, null, null);
 
@@ -97,27 +98,62 @@ public class Agency {
             } else if (succflip == 1) {
                 agent.connectedAgent.myCoin = Coin.Tails;
             }
-            System.out.println("My coin: " + agent.myCoin + ", succ coin: " + agent.connectedAgent.myCoin);
 
             if (agent.myCoin == Coin.Heads && agent.connectedAgent.myCoin == Coin.Tails) {
-                System.out.println("Agent " + agent.currentHouse + " is now inactive");
                 agent.isActive = false;
             }
 
             //EXPLORE STEP
-            if (agent.isActive) {
+            if (agent.isActive == true) {
+                
+                //perform another coin flip to get the active status of the connected agent
+                succflip = random.nextInt(2);
+                if (succflip == 0) {
+                    agent.connectedAgent.connectedAgent.myCoin = Coin.Heads;
+                } else if (succflip == 1) {
+                    agent.connectedAgent.connectedAgent.myCoin = Coin.Tails;
+                }
+                if (agent.connectedAgent.myCoin == Coin.Heads && agent.connectedAgent.connectedAgent.myCoin == Coin.Tails) {
+                    agent.connectedAgent.isActive = false;
+                }
+                
                 boolean succActive = agent.connectedAgent.isActive;
-                while (!succActive) {
-                    agent.children.add(agent.connectedAgent);
-                    agent.connectedAgent = agent.connectedAgent.connectedAgent;
-                    succActive = agent.connectedAgent.isActive;
+                //build a tree of children and look for a cycle
+                while (succActive == false) {
+                    if (agent.children.contains(agent.connectedAgent)) {
+                        break;
+                    }
+                    agent.children.add(agent.connectedAgent);       //add this connected agent to the agent's children list
+                    agent.connectedAgent = agent.connectedAgent.connectedAgent;     //move to the next agent in the tree
+                    
+                    //perform another coin flip to get the active status of the new connected agent
+                    succflip = random.nextInt(2);
+                    if (succflip == 0) {
+                        agent.connectedAgent.connectedAgent.myCoin = Coin.Heads;
+                    } else if (succflip == 1) {
+                        agent.connectedAgent.connectedAgent.myCoin = Coin.Tails;
+                    }
+                    if (agent.connectedAgent.myCoin == Coin.Heads && agent.connectedAgent.connectedAgent.myCoin == Coin.Tails) {
+                        agent.connectedAgent.isActive = false;
+                    }
+                    
+                    succActive = agent.connectedAgent.isActive;                    
                 }
 
+                //if the tree has come back around to the agent, a cycle has been found
                 if (agent.connectedAgent == agent) {
                     agent.isActive = false;
                 }
             }
         }
+        
+//        System.out.println("Agent and children");
+//        System.out.println(agent.currentHouse);
+//        int count = 0;
+//        for (Agent child : agent.children) {
+//            count++;
+//            System.out.println("child " + count + ": " + child.currentHouse);
+//        }
 
         //NOTIFY STEP
         if (agent.connectedAgent == agent) {
@@ -194,6 +230,9 @@ public class Agency {
                 if (agentToNotify.equals(this)) {
                     System.out.println("Agent " + currentHouse + " is in a cycle!");
                     inCycle = true;
+                    for (Agent child : agentToNotify.children) {
+                        MESSAGE_SENDER.firePropertyChange(NOTIFY_CHILDREN_OF_CYCLE, null, child);
+                    }
                 }
             }
         }
