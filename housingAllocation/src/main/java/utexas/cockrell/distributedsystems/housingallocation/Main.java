@@ -11,11 +11,14 @@ package utexas.cockrell.distributedsystems.housingallocation;
  */
 public class Main {
 
-    public static final int NUM_HOUSE_AND_AGENTS = 7;
+    public static boolean DEBUG = true;
+    public static boolean USE_LAS_VEGAS = true;
+    
+    public static final int NUM_HOUSE_AND_AGENTS = 100;
 
     public static void main(String[] args) {
 
-        Agency agency = Agency.getInstance();
+        Agency agency = Agency.getInstance();     
 
     }
 
