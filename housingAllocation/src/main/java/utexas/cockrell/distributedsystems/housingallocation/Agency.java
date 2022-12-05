@@ -6,7 +6,9 @@ import java.beans.PropertyChangeSupport;
 import java.util.ArrayList;
 import java.util.Collections;
 import java.util.Iterator;
+import java.util.LinkedList;
 import java.util.List;
+import java.util.Objects;
 import java.util.Random;
 import java.util.concurrent.CopyOnWriteArrayList;
 import java.util.concurrent.atomic.AtomicInteger;
@@ -129,39 +131,13 @@ public class Agency {
 
     public void lasVegasTTC(Agent agent, boolean debug) {
         while (agent.isActive) {
-            //COIN FLIP STEP
-
-            //Flip coin for current agent
-            //Random random = new Random();
-            int myflip = random.nextInt(2);
-            if (myflip == 0) {
-                agent.myCoin = Coin.Heads;
-            } else if (myflip == 1) {
-                agent.myCoin = Coin.Tails;
-            }
-
-            //Flip coin for successor
-            int succflip = random.nextInt(2);
-            if (succflip == 0) {
-                agent.connectedAgent.myCoin = Coin.Heads;
-            } else if (succflip == 1) {
-                agent.connectedAgent.myCoin = Coin.Tails;
-            }
-
             if (agent.myCoin == Coin.Heads && agent.connectedAgent.myCoin == Coin.Tails) {
                 agent.isActive = false;
             }
 
             //EXPLORE STEP
-            if (agent.isActive == true) {
+            if (agent.isActive) {
 
-                //perform another coin flip to get the active status of the connected agent
-                succflip = random.nextInt(2);
-                if (succflip == 0) {
-                    agent.connectedAgent.connectedAgent.myCoin = Coin.Heads;
-                } else if (succflip == 1) {
-                    agent.connectedAgent.connectedAgent.myCoin = Coin.Tails;
-                }
                 if (agent.connectedAgent.myCoin == Coin.Heads && agent.connectedAgent.connectedAgent.myCoin == Coin.Tails) {
                     agent.connectedAgent.isActive = false;
                 }
@@ -169,27 +145,19 @@ public class Agency {
                 boolean succActive = agent.connectedAgent.isActive;
                 //build a tree of children and look for a cycle
                 while (succActive == false) {
-                    if (agent.children.contains(agent.connectedAgent)) {
-                        break;
-                    }
-                    agent.children.add(agent.connectedAgent);       //add this connected agent to the agent's children list
-                    agent.connectedAgent.parents.add(agent);
-                    agent.connectedAgent = agent.connectedAgent.connectedAgent;     //move to the next agent in the tree
+                    if (!agent.children.contains(agent.connectedAgent)) {
 
-                    //perform another coin flip to get the active status of the new connected agent
-                    succflip = random.nextInt(2);
-                    if (succflip == 0) {
-                        agent.connectedAgent.connectedAgent.myCoin = Coin.Heads;
-                    } else if (succflip == 1) {
-                        agent.connectedAgent.connectedAgent.myCoin = Coin.Tails;
-                    }
-                    if (agent.connectedAgent.myCoin == Coin.Heads && agent.connectedAgent.connectedAgent.myCoin == Coin.Tails) {
-                        agent.connectedAgent.isActive = false;
-                    }
+                        agent.children.add(agent.connectedAgent);//add this connected agent to the agent's children list
 
-                    succActive = agent.connectedAgent.isActive;
+                        agent.connectedAgent.parents.add(agent);
+                        agent.connectedAgent = agent.connectedAgent.connectedAgent;     //move to the next agent in the tree
+
+                        if (agent.connectedAgent.myCoin == Coin.Heads && agent.connectedAgent.connectedAgent.myCoin == Coin.Tails) {
+                            agent.connectedAgent.isActive = false;
+                        }
+                        succActive = agent.connectedAgent.isActive;
+                    }
                 }
-
                 //if the tree has come back around to the agent, a cycle has been found
                 if (agent.connectedAgent == agent) {
                     agent.isActive = false;
@@ -237,11 +205,11 @@ public class Agency {
     public class Agent implements PropertyChangeListener {
 
         private Agent connectedAgent;
-        private ArrayList<Agent> parents = new ArrayList<>();
-        private ArrayList<Agent> children = new ArrayList<>();
+        private CopyOnWriteArrayList<Agent> parents = new CopyOnWriteArrayList<>();
+        private CopyOnWriteArrayList<Agent> children = new CopyOnWriteArrayList<>();
         private CopyOnWriteArrayList<Agent> agentList;
 
-        private final List<Integer> preferenceList;
+        private final LinkedList<Integer> preferenceList;
         private int currentHouse;
 
         private boolean firstPreference = false;
@@ -250,7 +218,6 @@ public class Agency {
 
         private boolean assigned = false;
         private Agent succesor;
-        private int choicePointer = 0;
 
         Coin myCoin;
         int color;
@@ -258,7 +225,7 @@ public class Agency {
         private Agent(int currentHouse) {
             this.currentHouse = currentHouse;
 
-            preferenceList = new ArrayList<>();
+            preferenceList = new LinkedList<>();
 
             for (Integer i : availableHouses) {
                 preferenceList.add(i);
@@ -266,6 +233,8 @@ public class Agency {
             Collections.shuffle(preferenceList);
 
             firstPreference = preferenceList.get(0) == currentHouse;
+
+            myCoin = random.nextBoolean() ? Coin.Heads : Coin.Tails;
         }
 
         @Override
@@ -284,6 +253,7 @@ public class Agency {
                     System.out.println("Agent " + currentHouse + " is in a cycle!");
                     inCycle = true;
                     for (Agent child : agentToNotify.children) {
+                        System.out.println("\tNotifying child: " + child.currentHouse);
                         MESSAGE_SENDER.firePropertyChange(NOTIFY_CHILDREN_OF_CYCLE, null, child);
                     }
                 }
@@ -303,7 +273,7 @@ public class Agency {
 
         @Override
         public String toString() {
-            return "Agent{" + "preferenceList=" + preferenceList + ", currentHouse=" + currentHouse + ", firstPreference=" + firstPreference + '}';
+            return "Agent{" + "parents=" + parents + ", children=" + children + ", agentList=" + agentList + ", preferenceList=" + preferenceList + ", currentHouse=" + currentHouse + ", firstPreference=" + firstPreference + ", isActive=" + isActive + ", inCycle=" + inCycle + ", assigned=" + assigned + ", succesor=" + succesor + ", myCoin=" + myCoin + '}';
         }
 
         public String status() {
@@ -311,6 +281,67 @@ public class Agency {
                     + "\tPrefered House: " + preferenceList.get(0) + "\n"
                     + "\tpreferenceListSize: " + preferenceList.size() + "\n"
                     + "\tconnectedAgent: " + connectedAgent.currentHouse;
+        }
+
+        @Override
+        public int hashCode() {
+            int hash = 5;
+            return hash;
+        }
+
+        @Override
+        public boolean equals(Object obj) {
+            if (this == obj) {
+                return true;
+            }
+            if (obj == null) {
+                return false;
+            }
+            if (getClass() != obj.getClass()) {
+                return false;
+            }
+            final Agent other = (Agent) obj;
+            if (this.currentHouse != other.currentHouse) {
+                return false;
+            }
+            if (this.firstPreference != other.firstPreference) {
+                return false;
+            }
+            if (this.isActive != other.isActive) {
+                return false;
+            }
+            if (this.inCycle != other.inCycle) {
+                return false;
+            }
+            if (this.assigned != other.assigned) {
+                return false;
+            }
+
+            if (this.color != other.color) {
+                return false;
+            }
+            if (!Objects.equals(this.connectedAgent, other.connectedAgent)) {
+                return false;
+            }
+            if (!Objects.equals(this.parents, other.parents)) {
+                return false;
+            }
+            if (!Objects.equals(this.children, other.children)) {
+                return false;
+            }
+            if (!Objects.equals(this.agentList, other.agentList)) {
+                return false;
+            }
+            if (!Objects.equals(this.preferenceList, other.preferenceList)) {
+                return false;
+            }
+            if (!Objects.equals(this.succesor, other.succesor)) {
+                return false;
+            }
+            if (this.myCoin != other.myCoin) {
+                return false;
+            }
+            return true;
         }
 
         private Runnable getOkRunnable() {
@@ -321,9 +352,8 @@ public class Agency {
                     if (agent.parents.isEmpty()) {//This agent is a root node
                         MESSAGE_SENDER.firePropertyChange(NEXT_STAGE, null, null);
                     } else {
-                        Iterator<Agent> itt = agent.parents.iterator();
-                        while (itt.hasNext()) {
-                            Agent parentAgent = itt.next();
+
+                        for (Agent parentAgent : agent.parents) {
                             Thread t = new Thread(parentAgent.getOkRunnable());
                             t.start();
                         }
@@ -339,7 +369,7 @@ public class Agency {
                 public void run() {
                     if (!agent.assigned) {
                         agent.isActive = true;
-                        int nextChoice = agent.preferenceList.get(++choicePointer);
+                        int nextChoice = agent.preferenceList.pop();
                         for (Agent agentToSearchThrough : agentList) {
                             if (agentToSearchThrough.currentHouse == nextChoice) {
                                 agent.connectedAgent = agentToSearchThrough;
@@ -357,7 +387,14 @@ public class Agency {
             return new Runnable() {
                 @Override
                 public void run() {
-                    agent.preferenceList.remove(removal);
+                    int index = -1;
+                    for (int i = 0; i < agent.preferenceList.size(); i++) {
+                        index = agent.preferenceList.get(i) == removal ? i : -1;
+                    }
+
+                    if (index != -1) {
+                        agent.preferenceList.remove(index);
+                    }
                 }
             };
         }
