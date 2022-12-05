@@ -1,8 +1,3 @@
-/*
- * To change this license header, choose License Headers in Project Properties.
- * To change this template file, choose Tools | Templates
- * and open the template in the editor.
- */
 package utexas.cockrell.distributedsystems.housingallocation;
 
 import java.beans.PropertyChangeEvent;
@@ -14,6 +9,7 @@ import java.util.Iterator;
 import java.util.List;
 import java.util.Random;
 import java.util.concurrent.CopyOnWriteArrayList;
+import java.util.concurrent.atomic.AtomicInteger;
 
 /**
  *
@@ -35,6 +31,8 @@ public class Agency {
     private static boolean init = false;
     private static Agency agency;
     private static Random random = new Random();
+
+    private static AtomicInteger coloringCount = new AtomicInteger(1);
 
     CopyOnWriteArrayList<Agent> agentList = new CopyOnWriteArrayList<>();
     CopyOnWriteArrayList<Integer> availableHouses = new CopyOnWriteArrayList<>();
@@ -107,10 +105,26 @@ public class Agency {
         return agency;
     }
 
+    /**
+     * Algorithm Par-VertexColoring: A Parallel Algorithm for Vertex Coloring in
+     * a Ring 1 input: n nodes arranged in a cycle such that next[i] gives the
+     * next node for node i 2 A coloring c of vertices such that for all i: c[i]
+     * di↵ers form c[next[i]] 3 output: Another valid coloring d with fewer
+     * colors 4 forall nodes i in parallel do 5 let k be the least significant
+     * bit such that c[i] and c[next[i]] di↵er 6 d[i] := 2 ⇤ k+ the kth least
+     * significant bit in c[i
+     *
+     * @param agent
+     * @param debug
+     */
     public void coloringTTC(Agent agent, boolean debug) {
-        while (agent.isActive) {
-
-        }
+        Thread t = new Thread(new Runnable() {
+            @Override
+            public void run() {
+                agent.color = 2 * 1 + coloringCount.getAndIncrement();
+            }
+        });
+        t.start();
     }
 
     public void lasVegasTTC(Agent agent, boolean debug) {
@@ -239,6 +253,7 @@ public class Agency {
         private int choicePointer = 0;
 
         Coin myCoin;
+        int color;
 
         private Agent(int currentHouse) {
             this.currentHouse = currentHouse;
