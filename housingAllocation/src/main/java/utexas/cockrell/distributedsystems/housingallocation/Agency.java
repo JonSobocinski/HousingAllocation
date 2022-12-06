@@ -3,11 +3,8 @@ package utexas.cockrell.distributedsystems.housingallocation;
 import java.beans.PropertyChangeEvent;
 import java.beans.PropertyChangeListener;
 import java.beans.PropertyChangeSupport;
-import java.util.ArrayList;
 import java.util.Collections;
-import java.util.Iterator;
 import java.util.LinkedList;
-import java.util.List;
 import java.util.Objects;
 import java.util.Random;
 import java.util.concurrent.CopyOnWriteArrayList;
@@ -16,6 +13,7 @@ import java.util.concurrent.atomic.AtomicInteger;
 /**
  *
  * @author jsobocinski
+ * @author tstubbs
  */
 public class Agency {
 
@@ -38,6 +36,8 @@ public class Agency {
 
     CopyOnWriteArrayList<Agent> agentList = new CopyOnWriteArrayList<>();
     CopyOnWriteArrayList<Integer> availableHouses = new CopyOnWriteArrayList<>();
+
+    CopyOnWriteArrayList<Thread> listOfTasks = new CopyOnWriteArrayList<>();
 
     private Agency() {
         //Create a list of available houses
@@ -73,7 +73,15 @@ public class Agency {
             distibutedTTC(ag, Main.DEBUG);
         }
 
-        MESSAGE_SENDER.firePropertyChange(SEND_STATUS, null, null);
+    }
+
+    public void sendStatus() throws InterruptedException {
+        for (Thread t : listOfTasks) {
+            t.join();
+        }
+        for (Agent a : agentList) {
+            System.out.println(a.toString());
+        }
     }
 
     private void distibutedTTC(Agent p, boolean debug) {
@@ -85,6 +93,7 @@ public class Agency {
         }
 
         if (p.inCycle) {
+            System.out.println("Updating current house from: " + p.currentHouse + " to " + p.connectedAgent.currentHouse);
             p.currentHouse = p.connectedAgent.currentHouse;
             p.assigned = true;
             MESSAGE_SENDER.firePropertyChange(REMOVE, null, p.currentHouse);
@@ -92,6 +101,7 @@ public class Agency {
             if (p.children.isEmpty()) {
                 for (Agent parentAgent : p.parents) {
                     Thread t = new Thread(parentAgent.getOkRunnable());
+                    listOfTasks.add(t);
                     t.start();
                 }
             }
@@ -131,12 +141,19 @@ public class Agency {
 
     public void lasVegasTTC(Agent agent, boolean debug) {
         while (agent.isActive) {
+
+            agent.flipMyCoin();
+            agent.connectedAgent.flipMyCoin();
+
             if (agent.myCoin == Coin.Heads && agent.connectedAgent.myCoin == Coin.Tails) {
                 agent.isActive = false;
             }
 
             //EXPLORE STEP
             if (agent.isActive) {
+                System.out.println("Agent " + agent.currentHouse + " is active");
+
+                agent.connectedAgent.connectedAgent.flipMyCoin();
 
                 if (agent.connectedAgent.myCoin == Coin.Heads && agent.connectedAgent.connectedAgent.myCoin == Coin.Tails) {
                     agent.connectedAgent.isActive = false;
@@ -144,19 +161,25 @@ public class Agency {
 
                 boolean succActive = agent.connectedAgent.isActive;
                 //build a tree of children and look for a cycle
-                while (succActive == false) {
+                while (succActive == false && agent.connectedAgent.currentHouse != agent.connectedAgent.connectedAgent.currentHouse) {
+                    System.out.println("Connected Agent " + agent.connectedAgent.currentHouse + " is active");
+
                     if (!agent.children.contains(agent.connectedAgent)) {
-
                         agent.children.add(agent.connectedAgent);//add this connected agent to the agent's children list
-
                         agent.connectedAgent.parents.add(agent);
-                        agent.connectedAgent = agent.connectedAgent.connectedAgent;     //move to the next agent in the tree
-
-                        if (agent.connectedAgent.myCoin == Coin.Heads && agent.connectedAgent.connectedAgent.myCoin == Coin.Tails) {
-                            agent.connectedAgent.isActive = false;
-                        }
-                        succActive = agent.connectedAgent.isActive;
                     }
+                    agent.connectedAgent = agent.connectedAgent.connectedAgent;//move to the next agent in the tree
+
+                    agent.connectedAgent.flipMyCoin();
+                    agent.connectedAgent.connectedAgent.flipMyCoin();
+
+                    if (agent.connectedAgent.myCoin == Coin.Heads && agent.connectedAgent.connectedAgent.myCoin == Coin.Tails) {
+                        agent.connectedAgent.isActive = false;
+                    } else {
+                        agent.connectedAgent.isActive = true;
+                    }
+
+                    succActive = agent.connectedAgent.isActive;
                 }
                 //if the tree has come back around to the agent, a cycle has been found
                 if (agent.connectedAgent == agent) {
@@ -234,6 +257,16 @@ public class Agency {
 
             firstPreference = preferenceList.get(0) == currentHouse;
 
+            flipMyCoin();
+
+        }
+
+        public void connectedAgentInfo() {
+            System.out.println("Agent: " + this.currentHouse);
+            System.out.println("Agent connected agent: " + this.connectedAgent.currentHouse + "\n");
+        }
+
+        private void flipMyCoin() {
             myCoin = random.nextBoolean() ? Coin.Heads : Coin.Tails;
         }
 
@@ -244,9 +277,7 @@ public class Agency {
 //                System.out.println("Removing " + houseToRemove + " from " + currentHouse);
                 preferenceList.remove(houseToRemove);
             } else if (evt.getPropertyName().equals(SEND_STATUS)) {
-                if (isActive) {
-                    System.out.println(status());
-                }
+                this.toString();
             } else if (evt.getPropertyName().equals(NOTIFY_CHILDREN_OF_CYCLE)) {
                 Agent agentToNotify = (Agent) evt.getNewValue();
                 if (agentToNotify.equals(this)) {
@@ -261,19 +292,22 @@ public class Agency {
                 agentList = (CopyOnWriteArrayList<Agent>) evt.getNewValue();
             } else if (evt.getPropertyName().equals(OK)) {
                 Thread t = new Thread(getOkRunnable());
+                listOfTasks.add(t);
                 t.start();
             } else if (evt.getPropertyName().equals(NEXT_STAGE)) {
                 Thread t = new Thread(getNextStageRunnable());
+                listOfTasks.add(t);
                 t.start();
             } else if (evt.getPropertyName().equals(REMOVE)) {
                 Thread t = new Thread(getRemoveRunnable((int) evt.getNewValue()));
+                listOfTasks.add(t);
                 t.start();
             }
         }
 
         @Override
         public String toString() {
-            return "Agent{" + "parents=" + parents + ", children=" + children + ", agentList=" + agentList + ", preferenceList=" + preferenceList + ", currentHouse=" + currentHouse + ", firstPreference=" + firstPreference + ", isActive=" + isActive + ", inCycle=" + inCycle + ", assigned=" + assigned + ", succesor=" + succesor + ", myCoin=" + myCoin + '}';
+            return "Agent{" + "preferenceList=" + preferenceList + ", currentHouse=" + currentHouse + ", firstPreference=" + firstPreference + ", myCoin=" + myCoin + '}';
         }
 
         public String status() {
@@ -281,12 +315,6 @@ public class Agency {
                     + "\tPrefered House: " + preferenceList.get(0) + "\n"
                     + "\tpreferenceListSize: " + preferenceList.size() + "\n"
                     + "\tconnectedAgent: " + connectedAgent.currentHouse;
-        }
-
-        @Override
-        public int hashCode() {
-            int hash = 5;
-            return hash;
         }
 
         @Override
@@ -352,9 +380,9 @@ public class Agency {
                     if (agent.parents.isEmpty()) {//This agent is a root node
                         MESSAGE_SENDER.firePropertyChange(NEXT_STAGE, null, null);
                     } else {
-
                         for (Agent parentAgent : agent.parents) {
                             Thread t = new Thread(parentAgent.getOkRunnable());
+                            listOfTasks.add(t);
                             t.start();
                         }
                     }
